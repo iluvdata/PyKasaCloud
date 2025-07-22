@@ -1,0 +1,5 @@
+.kasa*
+pykasacloud/__pycache__/
+.venv/
+.vscode/
+pykasacloud/__main__.py
