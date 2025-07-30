@@ -1,5 +1,5 @@
 .kasa*
-pykasacloud/__pycache__/
+*__pycache__*
 .venv/
 .vscode/
 pykasacloud/__main__.py

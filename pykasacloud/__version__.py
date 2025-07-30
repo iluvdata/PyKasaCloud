@@ -1,1 +1,3 @@
-VERSION="2025.07.09"
+"""Library version."""
+
+VERSION="2025.7.10"

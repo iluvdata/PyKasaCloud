@@ -1,8 +1,41 @@
 # PyKasaCloud
 
-This is a package for interacting with the Kasa Cloud API. Much of the leg work was performed by [piekstra](https://github.com/piekstra) in [tplink-cloud-api](https://github.com/piekstra/tplink-cloud-api).
+This is a library wrapper that allows you to connect to *some* TPLink/Kasa/Tapo devices via the cloud utilizing the excellent [python-kasa](https://pypi.org/project/python-kasa/) library.  Essentially this adds a transport and protocol class to facilitate this.  This has not been tested extensively as I only have access to "iot" protocol devices and I'm not sure if other devices utilize passthrough mechanism via the cloud api.
 
-It uses some code from the excellent [kasa-python](https://github.com/python-kasa/python-kasa) library.
+## Usage
 
-It's primary intention is to support a Home Assistant integration to complement the built [Tp-Link Smart Home](https://www.home-assistant.io/integrations/tplink/) integration.  Currently it only supports a small subset of functionality.
+Rather than use discovery like `python-kasa` you must get connect to the cloud (providing credentials) to obtain a token.
+```python
+cloud: KasaCloud = await KasaCloud.auth(username="username", password="password")
+```
+You can then get a dictionary of devices.  The deviceId in the cloud will be the keys and the values will be `kasa.Device`s.
+```python
+devices: dict[str, Device] = cloud.getDevices()
+```
+You can then interact with these devices like python-kasa devices.
+
+### Caching tokens
+
+To cache tokens to a json file, provide a path.
+```python
+cloud: KasaCloud = await KasaCloud.auth(username="username", password="password", token_storage_file=".kasacloud.json")
+```
+Subsequent authenication can be accomplished just using the `token_storage_file` parameter.
+```python
+cloud: KasaCloud = await KasaCloud.auth( token_storage_file=".kasacloud.json")
+```
+### Refesh Token and Callbacks
+If you are storing the token externally, say in a HomeAssistant Config Entry simply pass a `Token` object:
+```python
+
+def token_update_callback(config_entry: ConfigEntry) -> Callable:
+    def updated_token(token: Token) -> None:
+        config_entry["token"] <- token
+    return update_token
+
+token = Token(**config_entry.get("token"))
+cloud: KasaCloud = await KasaCloud.auth(token=token, token_update_callback = token_update_callback(config_entry))
+```
+
+
 
