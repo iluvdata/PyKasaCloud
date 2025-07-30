@@ -3,3 +3,4 @@
 .venv/
 .vscode/
 pykasacloud/__main__.py
+dist
