@@ -4,3 +4,6 @@
 .vscode/
 pykasacloud/__main__.py
 dist
+.DS_Store
+pykasacloud/__main__.py
+.DS_Store

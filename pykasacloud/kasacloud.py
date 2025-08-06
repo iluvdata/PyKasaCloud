@@ -1,8 +1,8 @@
 """KasaCloud."""
 
+from collections.abc import Callable, Coroutine
 import logging
 import time
-from collections.abc import Callable, Coroutine
 from typing import Any
 
 from kasa import Device, DeviceType
@@ -17,19 +17,17 @@ from kasa.iot import (
 )
 
 from .exceptions import KasaCloudError
-
 from .protocols import CloudProtocol
 from .transports import CloudTransport, Token
 
-_GET_DEVICES_QUERY: dict[str, str] = {
-   "method": "getDeviceList"
-}
+_GET_DEVICES_QUERY: dict[str, str] = {"method": "getDeviceList"}
 
 GET_SYSINFO_QUERY: dict[str, dict[str, dict]] = {
     "system": {"get_sysinfo": {}},
 }
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class KasaCloud:
     """Class to instantiate and get devices."""
@@ -56,13 +54,22 @@ class KasaCloud:
             password=password,
             token=ctoken,
             token_storage_file=token_storage_file,
-            token_update_callback=token_update_callback
+            token_update_callback=token_update_callback,
         )
 
         return self
 
-    async def get_devices(self) -> dict[str, Device]:
-        """Get kasa devices from cloud."""
+    @property
+    def token(self) -> Token:
+        """Return the token associated with this authentication."""
+        return self._transport.token
+
+    async def close(self) -> None:
+        """Close the underlying resources."""
+        await self._transport.close()
+
+    async def get_device_list(self) -> dict[str, Any]:
+        """Get kasa device ids from cloud."""
 
         protocol: CloudProtocol = CloudProtocol(transport=self._transport)
 
@@ -73,16 +80,18 @@ class KasaCloud:
 
         device_list: list[dict[str, Any]] = resp["deviceList"]
 
-        device_dict: dict[str, Device] = {}
+        devices: dict[str, Any] = {}
         for device in device_list:
             if device["status"]:
-                device_dict[device["deviceId"]] = await self._get_device(device)
+                devices[device["deviceId"]] = device
 
-        return device_dict
+        return devices
 
-    async def _get_device(self, device_dict: dict[str, Any]) -> Device:
-        """Initantiate and populate the device.  
-        Taken from device_factory.py in python-kasa."""
+    async def get_device(self, device_dict: dict[str, Any]) -> Device:
+        """Initantiate and populate the device.
+
+        Taken from device_factory.py in python-kasa.
+        """
         debug_enabled = _LOGGER.isEnabledFor(logging.DEBUG)
         if debug_enabled:
             start_time = time.perf_counter()
@@ -116,9 +125,10 @@ class KasaCloud:
         _perf_log(True, "update")
         return device
 
+
 def _get_device_class_from_sys_info(sysinfo: dict[str, Any]) -> type[IotDevice]:
     """Find SmartDevice subclass for device described by passed data."""
-    TYPE_TO_CLASS = { # pylint: disable=invalid-name
+    TYPE_TO_CLASS = {  # pylint: disable=invalid-name
         DeviceType.Bulb: IotBulb,
         DeviceType.Plug: IotPlug,
         DeviceType.Dimmer: IotDimmer,
@@ -128,4 +138,4 @@ def _get_device_class_from_sys_info(sysinfo: dict[str, Any]) -> type[IotDevice]:
         # Disabled until properly implemented
         # DeviceType.Camera: IotCamera,
     }
-    return TYPE_TO_CLASS[IotDevice._get_device_type_from_sys_info(sysinfo)] # pylint: disable=protected-access
+    return TYPE_TO_CLASS[IotDevice._get_device_type_from_sys_info(sysinfo)]  # pylint: disable=protected-access  # noqa: SLF001

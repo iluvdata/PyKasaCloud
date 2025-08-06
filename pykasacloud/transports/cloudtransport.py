@@ -1,60 +1,78 @@
 """Kasa Cloud API module for PyKasaCloud."""
 
-import json
-import logging
-import uuid
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+import json
+import logging
+from typing import TYPE_CHECKING, Any, TypedDict, cast
+import uuid
 
 import anyio
-from kasa import AuthenticationError, BaseTransport, DeviceConfig, DeviceError, KasaException
+from kasa import (
+    AuthenticationError,
+    BaseTransport,
+    DeviceConfig,
+    DeviceError,
+    KasaException,
+)
 from kasa.exceptions import _RetryableError
 from kasa.httpclient import HttpClient
-from kasa.json import dumps as json_dumps
-from kasa.json import loads as json_loads
-
+from kasa.json import dumps as json_dumps, loads as json_loads
 from yarl import URL
 
-from ..const import API_URL, APPTYPE, USERAGENT
-from ..exceptions import CloudErrorCode, KasaCloudError
+from pykasacloud.const import (
+    API_URL,
+    APPSERVERURL,
+    APPTYPE,
+    CLIENT_ID,
+    REFRESH_TOKEN,
+    TOKEN,
+    USERAGENT,
+)
+from pykasacloud.exceptions import CloudErrorCode, KasaCloudError
 
 _LOGGER = logging.getLogger(__name__)
 
+
 @dataclass
-class Token:
+class Token(TypedDict):
     """Token dataclass."""
+
     token: str
     refresh_token: str
     client_id: str
+    account_id: int
+
 
 class CloudTransport(BaseTransport):
     """CloudTransport."""
 
-    COMMON_HEADERS = {
-        "Content-Type": "application/json",
-        "User-Agent": USERAGENT
-    }
+    COMMON_HEADERS = {"User-Agent": USERAGENT}
 
     _token: Token
     _token_storage_file: str | None
     _token_update_callback: Callable[[Token], Coroutine] | None
     _http_client: HttpClient
+    _url: URL = URL(API_URL)
 
     @classmethod
-    async def auth(cls, *,
+    async def auth(
+        cls,
+        *,
         username: str | None = None,
         password: str | None = None,
         token: Token | None = None,
         token_storage_file: str | None = None,
         token_update_callback: Callable[[Token], Coroutine] | None = None,
     ) -> "CloudTransport":
-        """Create a CloudTransport Class"""
+        """Create a CloudTransport Class."""
 
-        self = cls(config=DeviceConfig(host = "TPLink/Kasa Cloud"))
+        self = cls(config=DeviceConfig(host="TPLink/Kasa Cloud"))
 
         self._token_storage_file = token_storage_file
         self._token_update_callback = token_update_callback
+
+        self._http_client = HttpClient(config=self._config)
 
         if not token:
             if not username:
@@ -92,10 +110,16 @@ class CloudTransport(BaseTransport):
                     },
                 }
                 auth_results = await self._send_request(payload)
-                self._token = Token(auth_results["token"], auth_results["refreshToken"], client_id)
+                self._token = Token(
+                    token=auth_results["token"],
+                    refresh_token=auth_results["refreshToken"],
+                    client_id=client_id,
+                    account_id=auth_results["accountId"],
+                )
                 await self._cache_tokens()
+        else:
+            self._token = token
 
-            self._http_client = HttpClient(config=self._config)
         return self
 
     @property
@@ -113,7 +137,6 @@ class CloudTransport(BaseTransport):
         if self._token_update_callback:
             await self._token_update_callback(self._token)
 
-
     async def _handle_cloud_response_error_code(self, resp_dict: Any) -> None:
         """Handle response errors to request reauth etc."""
 
@@ -124,27 +147,29 @@ class CloudTransport(BaseTransport):
         msg = resp_dict["msg"]
         if cloud_error_code == CloudErrorCode.TOKEN_EXPIRED:
             await self._refresh_token()
-            raise _RetryableError("{msg}: {self._host}: {error_code.name}({code})",
-                                error_code=cloud_error_code)
+            raise _RetryableError(
+                "{msg}: {self._host}: {error_code.name}({code})",
+                error_code=cloud_error_code,
+            )
         if cloud_error_code == CloudErrorCode.DEVICE_OFFLINE:
             raise DeviceError(f"{msg}: {cloud_error_code.value}")
-        raise KasaCloudError(f"{msg}: {cloud_error_code.name}({cloud_error_code.value})")
+        raise KasaCloudError(
+            f"{msg}: {cloud_error_code.name}({cloud_error_code.value})"
+        )
 
-    async def send(
-        self, request: str
-    ) -> dict[str, Any]:
+    async def send(self, request: str) -> dict[str, Any]:
         """Not implemented."""
         return {}
 
-
     async def send_request(
-            self,
-            payload: dict[str, Any],
-            device_id: str | None = None,
-            url: URL | None = None) -> dict[str,Any]:
-        """Send request to Kasa Cloud"""
+        self,
+        payload: dict[str, Any],
+        device_id: str | None = None,
+        url: URL | None = None,
+    ) -> dict[str, Any]:
+        """Send request to Kasa Cloud."""
         cpayload: dict[str, Any] = {"params": {}}
-        cpayload["params"]["token"] = self._token.token
+        cpayload["params"]["token"] = self._token[TOKEN]
         if device_id:
             cpayload["method"] = "passthrough"
             cpayload["params"]["deviceId"] = device_id
@@ -152,7 +177,6 @@ class CloudTransport(BaseTransport):
         else:
             cpayload["method"] = payload["method"]
         return await self._send_request(cpayload, url)
-
 
     async def _send_request(
         self, payload: dict[str, Any], url: URL | None = None
@@ -163,16 +187,15 @@ class CloudTransport(BaseTransport):
         payload["params"]["appType"] = APPTYPE
 
         if not url:
-            url = URL(API_URL)
+            url = self._url
 
-        status_code, resp_dict = await self._http_client.post(url,
-                                                              json=payload,
-                                                              headers=self.COMMON_HEADERS)
+        status_code, resp_dict = await self._http_client.post(
+            url=url, json=payload, headers=self.COMMON_HEADERS
+        )
 
         if status_code != 200:
             raise KasaException(
-                f"{self._host} responded with an unexpected "
-                + f"status code {status_code}"
+                f"{self._host} responded with an unexpected status code {status_code}"
             )
 
         _LOGGER.debug("Response with %s: %r", status_code, resp_dict)
@@ -184,40 +207,50 @@ class CloudTransport(BaseTransport):
 
         if "result" in resp_dict:
             resp_dict = resp_dict["result"]
+            if resp_dict and "deviceList" in resp_dict and resp_dict["deviceList"]:
+                # get the url
+                self._url = URL(resp_dict["deviceList"][0][APPSERVERURL])
 
         if "responseData" in resp_dict:
             resp_dict = resp_dict["responseData"]
             if isinstance(resp_dict, str):
                 resp_dict = json_loads(resp_dict)
 
+        # await self.close()
+
         return resp_dict
 
     async def _refresh_token(self) -> None:
-        if not self._token.refresh_token:
-            raise AuthenticationError("No tokens or refresh token available for refreshing")
-        if not self._token.client_id:
+        if not self._token[REFRESH_TOKEN]:
+            raise AuthenticationError(
+                "No tokens or refresh token available for refreshing"
+            )
+        if not self._token[CLIENT_ID]:
             raise AuthenticationError("No client_id available for refreshing token")
         payload: dict[str, Any] = {
             "method": "refreshToken",
             "params": {
-                "refreshToken": self._token.refresh_token,
-                "terminalUUID": self._token.client_id,
+                "refreshToken": self._token[REFRESH_TOKEN],
+                "terminalUUID": self._token[CLIENT_ID],
             },
         }
         new_token: dict[str, Any] = await self._send_request(payload)
-        self._token.token = new_token["token"]
+        self._token[TOKEN] = new_token[TOKEN]
         await self._cache_tokens()
 
     @property
     def default_port(self) -> int:
+        """Default port is irrevelant for cloud operations."""
         return 443
 
     @property
     def credentials_hash(self) -> str | None:
+        """Cloud doesn't use credentials hash."""
         return None
 
     async def close(self) -> None:
+        """Close the transport."""
         await self._http_client.close()
 
     async def reset(self) -> None:
-        return None
+        """This does nothing."""

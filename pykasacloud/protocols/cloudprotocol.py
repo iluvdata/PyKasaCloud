@@ -10,9 +10,10 @@ from kasa.protocols.iotprotocol import REDACTORS
 from kasa.protocols.protocol import redact_data
 from yarl import URL
 
-from ..transports import CloudTransport
+from pykasacloud.transports import CloudTransport
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class CloudProtocol(IotProtocol):
     """Cloud Protocol Class."""
@@ -36,7 +37,9 @@ class CloudProtocol(IotProtocol):
             )
         transport: CloudTransport = cast(CloudTransport, self._transport)
 
-        resp = await transport.send_request(json_loads(request), self._device_id, self._url)
+        resp = await transport.send_request(
+            json_loads(request), self._device_id, self._url
+        )
 
         if debug_enabled:
             data = redact_data(resp, REDACTORS) if self._redact_data else resp

@@ -9,10 +9,4 @@ from pykasacloud.kasacloud import KasaCloud, Token
 
 __version__ = version("python-kasa")
 
-__all__ = [
-    "CloudTransport",
-    "KasaCloudError",
-    "CloudProtocol",
-    "KasaCloud",
-    "Token"
-]
+__all__ = ["CloudTransport", "KasaCloudError", "CloudProtocol", "KasaCloud", "Token"]
