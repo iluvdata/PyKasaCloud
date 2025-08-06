@@ -1,8 +1,10 @@
 # PyKasaCloud
 
-![GitHub Release](https://img.shields.io/github/v/release/iluvdata/PyKasaCloud)
+![PyPI - Version](https://img.shields.io/pypi/v/pykasacloud)
 
 This is a library wrapper that allows you to connect to *some* TPLink/Kasa/Tapo devices via the cloud utilizing the excellent [python-kasa](https://pypi.org/project/python-kasa/) library.  Essentially this adds a transport and protocol class to facilitate this.  This has not been tested extensively as I only have access to "iot" protocol devices and I'm not sure if other devices utilize passthrough mechanism via the cloud api.
+
+This library was written to support the [TPLink Cloud Integration](https://github.com/iluvdata/tplink_cloud).
 
 ## Usage
 
