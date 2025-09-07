@@ -2,11 +2,17 @@
 
 from importlib.metadata import version
 
-from pykasacloud.transports import CloudTransport
-from pykasacloud.exceptions import KasaCloudError
-from pykasacloud.protocols import CloudProtocol
-from pykasacloud.kasacloud import KasaCloud, Token
+from .exceptions import KasaCloudError
+from .kasacloud import KasaCloud, Token
+from .protocols import CloudProtocol
+from .transports import CloudTransport
 
 __version__ = version("python-kasa")
 
-__all__ = ["CloudTransport", "KasaCloudError", "CloudProtocol", "KasaCloud", "Token"]
+__all__ = [
+    "CloudProtocol",
+    "CloudTransport",
+    "KasaCloud",
+    "KasaCloudError",
+    "Token",
+]

@@ -1,10 +1,10 @@
 """Constants for PyKasaCloud integration."""
 
+ACCOUNT_ID = "account_id"
 API_URL = "https://wap.tplinkcloud.com"
 APPTYPE = "Tapo_Ios"
 USERAGENT = "User-Agent: Dalvik/2.1.0 (Linux; U; Android 6.0.1; A0001 Build/M4B30X)"
 TOKEN = "token"
 REFRESH_TOKEN = "refresh_token"
 CLIENT_ID = "client_id"
-ACCOUNT_ID = "account_id"
 APPSERVERURL = "appServerUrl"
