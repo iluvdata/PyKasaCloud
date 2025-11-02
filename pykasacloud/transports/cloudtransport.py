@@ -3,10 +3,10 @@
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 import json
-import logging
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 import uuid
 
+from aiohttp import ClientSession
 import anyio
 from kasa import (
     AuthenticationError,
@@ -31,7 +31,7 @@ from pykasacloud.const import (
 )
 from pykasacloud.exceptions import CloudErrorCode, KasaCloudError
 
-_LOGGER = logging.getLogger(__name__)
+# _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,13 +52,14 @@ class CloudTransport(BaseTransport):
     _token: Token
     _token_storage_file: str | None
     _token_update_callback: Callable[[Token], Coroutine] | None
-    _http_client: HttpClient
     _url: URL = URL(API_URL)
+    _http_client: HttpClient
 
     @classmethod
     async def auth(
         cls,
         *,
+        client_session: ClientSession,
         username: str | None = None,
         password: str | None = None,
         token: Token | None = None,
@@ -67,7 +68,9 @@ class CloudTransport(BaseTransport):
     ) -> "CloudTransport":
         """Create a CloudTransport Class."""
 
-        self = cls(config=DeviceConfig(host="TPLink/Kasa Cloud"))
+        self = cls(
+            config=DeviceConfig(host="TPLink/Kasa Cloud", http_client=client_session),
+        )
 
         self._token_storage_file = token_storage_file
         self._token_update_callback = token_update_callback
@@ -140,7 +143,11 @@ class CloudTransport(BaseTransport):
     async def _handle_cloud_response_error_code(self, resp_dict: Any) -> None:
         """Handle response errors to request reauth etc."""
 
-        cloud_error_code = CloudErrorCode(resp_dict["error_code"])
+        try:
+            cloud_error_code = CloudErrorCode(resp_dict["error_code"])
+        except ValueError as ex:
+            raise KasaCloudError(f"Got unknown error: {resp_dict}") from ex
+
         if cloud_error_code == CloudErrorCode.SUCCESS:
             return
 
@@ -153,6 +160,8 @@ class CloudTransport(BaseTransport):
             )
         if cloud_error_code == CloudErrorCode.DEVICE_OFFLINE:
             raise DeviceError(f"{msg}: {cloud_error_code.value}")
+        if cloud_error_code == CloudErrorCode.INVALID_EMAIL_OR_PASSWORD:
+            raise AuthenticationError(resp_dict)
         raise KasaCloudError(
             f"{msg}: {cloud_error_code.name}({cloud_error_code.value})"
         )
@@ -198,7 +207,7 @@ class CloudTransport(BaseTransport):
                 f"{self._host} responded with an unexpected status code {status_code}"
             )
 
-        _LOGGER.debug("Response with %s: %r", status_code, resp_dict)
+        # _LOGGER.debug("Response with %s: %r", status_code, resp_dict)
 
         await self._handle_cloud_response_error_code(resp_dict)
 

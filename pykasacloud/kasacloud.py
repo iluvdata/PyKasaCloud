@@ -5,6 +5,7 @@ import logging
 import time
 from typing import Any
 
+from aiohttp import ClientSession
 from kasa import Device, DeviceType
 from kasa.iot import (
     IotBulb,
@@ -19,6 +20,8 @@ from kasa.iot import (
 from .exceptions import KasaCloudError
 from .protocols import CloudProtocol
 from .transports import CloudTransport, Token
+
+type DeviceDict = dict[str, Any]
 
 _GET_DEVICES_QUERY: dict[str, str] = {"method": "getDeviceList"}
 
@@ -37,6 +40,7 @@ class KasaCloud:
     @classmethod
     async def kasacloud(
         cls,
+        client_session: ClientSession,
         *,
         username: str | None = None,
         password: str | None = None,
@@ -49,7 +53,9 @@ class KasaCloud:
         self = cls()
 
         ctoken: Token | None = Token(**token) if token else None
+
         self._transport = await CloudTransport.auth(
+            client_session=client_session,
             username=username,
             password=password,
             token=ctoken,
@@ -68,7 +74,7 @@ class KasaCloud:
         """Close the underlying resources."""
         await self._transport.close()
 
-    async def get_device_list(self) -> dict[str, Any]:
+    async def get_device_list(self) -> list[DeviceDict]:
         """Get kasa device ids from cloud."""
 
         protocol: CloudProtocol = CloudProtocol(transport=self._transport)
@@ -80,12 +86,7 @@ class KasaCloud:
 
         device_list: list[dict[str, Any]] = resp["deviceList"]
 
-        devices: dict[str, Any] = {}
-        for device in device_list:
-            if device["status"]:
-                devices[device["deviceId"]] = device
-
-        return devices
+        return [device for device in device_list if device["status"]]
 
     async def get_device(self, device_dict: dict[str, Any]) -> Device:
         """Initantiate and populate the device.

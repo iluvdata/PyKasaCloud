@@ -2,7 +2,7 @@
 
 ![PyPI - Version](https://img.shields.io/pypi/v/pykasacloud)
 
-This is a library wrapper that allows you to connect to *some* TPLink/Kasa/Tapo devices via the cloud utilizing the excellent [python-kasa](https://pypi.org/project/python-kasa/) library.  Essentially this adds a transport and protocol class to facilitate this.  This has not been tested extensively as I only have access to "iot" protocol devices and I'm not sure if other devices utilize passthrough mechanism via the cloud api.
+This is a library wrapper that allows you to connect to *some* TPLink/Kasa/Tapo devices via the cloud utilizing the excellent [python-kasa](https://pypi.org/project/python-kasa/) library.  Essentially this adds a transport and protocol class to facilitate this.  This appears to only work on "iot" protocol (legacy) devices rather than "smart" protocol devices (tapo and some newer kasa devices).
 
 This library was written to support the [TPLink Cloud Integration](https://github.com/iluvdata/tplink_cloud).
 
@@ -12,9 +12,10 @@ Rather than use discovery like `python-kasa` you must get connect to the cloud (
 ```python
 cloud: KasaCloud = await KasaCloud.kasacloud(username="username", password="password")
 ```
-You can then get a dictionary of devices.  The `deviceId` in the cloud will be the keys and the values will be `kasa.Device`s.
+You can then get a list of device dictionaries which you can then use to get a `kasa.Device`:
 ```python
-devices: dict[str, Device] = cloud.getDevices()
+devices: list[DeviceDict] = cloud.get_device_list()
+device: Device = cloud.get_device(devices[0])
 ```
 You can then interact with these devices like python-kasa devices.
 
